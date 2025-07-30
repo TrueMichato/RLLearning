@@ -5,18 +5,6 @@ from Worker import worker
 
 if __name__ == "__main__":
 
-    # --- Hyperparameter Setup ---
-    GAMMA_A3C = 0.99             # Discount factor
-    LR_A3C = 1e-4                # Learning rate
-    N_STEPS = 5                  # Steps per update (n-step rollout length)
-    VALUE_LOSS_COEFF_A3C = 0.5   # Coefficient for value loss term
-    ENTROPY_COEFF_A3C = 0.01     # Coefficient for entropy bonus term
-
-    NUM_WORKERS = mp.cpu_count() # Use number of available CPU cores
-    # NUM_WORKERS = 4 # Or set manually
-    MAX_GLOBAL_STEPS_A3C = 100000  # Total training steps across all workers
-    MAX_STEPS_PER_EPISODE_A3C = 500 if ENV_NAME == "CartPole-v1" else 1000  # Environment-specific limits
-
     # Set multiprocessing start method (important for some OS like macOS/Windows)
     # 'spawn' is generally safer than 'fork' with CUDA/threading
     try:
@@ -35,8 +23,8 @@ if __name__ == "__main__":
 
     # Initialize Optimizer (acts on the shared global model's parameters)
     # Adam is common, but RMSprop was used in the original A3C paper
-    # global_optimizer_a3c = optim.RMSprop(global_model_a3c.parameters(), lr=LR_A3C, alpha=0.99, eps=1e-5)
-    global_optimizer_a3c = optim.Adam(global_model_a3c.parameters(), lr=LR_A3C)
+    global_optimizer_a3c = optim.RMSprop(global_model_a3c.parameters(), lr=LR_A3C, alpha=0.99, eps=1e-5)
+    # global_optimizer_a3c = optim.Adam(global_model_a3c.parameters(), lr=LR_A3C)
     print(f"Global optimizer initialized: {type(global_optimizer_a3c).__name__}")
 
     # Shared counter for total steps taken across all workers
