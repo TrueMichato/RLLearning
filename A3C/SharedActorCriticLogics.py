@@ -1,11 +1,15 @@
 from imports import *
 
 class ActorCriticNetwork(nn.Module):
-    """ Combined Actor-Critic network for A3C """
-    def __init__(self, n_observations: int, n_actions: int):
+    """ Combined Actor-Critic network for A3C that handles both discrete and continuous observation spaces """
+    def __init__(self, n_observations: int, n_actions: int, observation_type: str = "continuous"):
         super(ActorCriticNetwork, self).__init__()
+        
+        self.observation_type = observation_type
+        self.n_observations = n_observations
+        
         # Shared layers
-        self.layer1 = nn.Linear(n_observations, 128)
+        self.layer1 = nn.Linear(self.n_observations, 128)
         self.layer2 = nn.Linear(128, 128)
 
         # Actor head (outputs action logits)
@@ -13,6 +17,36 @@ class ActorCriticNetwork(nn.Module):
 
         # Critic head (outputs state value)
         self.critic_head = nn.Linear(128, 1)
+
+    def _preprocess_observation(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Preprocess observation based on observation type.
+        """
+        if self.observation_type == "discrete":
+            # Convert discrete state to one-hot encoding
+            if x.dim() == 0:  # Scalar input
+                x = x.unsqueeze(0)  # Add batch dimension
+            
+            # Ensure x is long tensor for one-hot encoding
+            x = x.long()
+            
+            # Create one-hot encoding
+            batch_size = x.shape[0]
+            x_onehot = torch.zeros(batch_size, self.n_observations, device=x.device, dtype=torch.float32)
+            x_onehot.scatter_(1, x.unsqueeze(1), 1.0)
+            return x_onehot
+        else:
+            # For continuous observations, just ensure proper format
+            if not isinstance(x, torch.Tensor):
+                raise TypeError(f"Input must be a torch.Tensor, got {type(x)}")
+            elif x.dtype != torch.float32:
+                x = x.to(dtype=torch.float32)
+            
+            # Add batch dimension if missing (e.g., single state input)
+            if x.dim() == 1:
+                x = x.unsqueeze(0)
+            
+            return x
 
     def forward(self, x: torch.Tensor) -> Tuple[Categorical, torch.Tensor]:
         """
@@ -26,17 +60,8 @@ class ActorCriticNetwork(nn.Module):
             - Action distribution (Categorical).
             - State value estimate (Tensor).
         """
-        # Ensure input is a FloatTensor
-        if not isinstance(x, torch.Tensor):
-             # Assume input needs conversion, place on model's device implicitly? No, safer to manage explicitly.
-             # Let's assume x is already a tensor on the correct device (CPU for workers)
-             raise TypeError(f"Input must be a torch.Tensor, got {type(x)}")
-        elif x.dtype != torch.float32:
-             x = x.to(dtype=torch.float32)
-
-        # Add batch dimension if missing (e.g., single state input)
-        if x.dim() == 1:
-            x = x.unsqueeze(0)
+        # Preprocess observation based on type
+        x = self._preprocess_observation(x)
 
         # Shared layers
         x = F.relu(self.layer1(x))
@@ -48,6 +73,13 @@ class ActorCriticNetwork(nn.Module):
         action_dist = Categorical(logits=action_logits.to(x.device))
 
         # Critic head
+        state_value = self.critic_head(shared_features)
+
+        # If input had no batch dim, remove it from output value
+        if x.shape[0] == 1 and state_value.dim() > 0: # Check state_value dim > 0 before squeeze
+            state_value = state_value.squeeze(0)
+
+        return action_dist, state_value
         state_value = self.critic_head(shared_features)
 
         # If input had no batch dim, remove it from output value

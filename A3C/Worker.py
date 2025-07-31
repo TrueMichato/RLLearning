@@ -26,8 +26,8 @@ def worker(worker_id: int,
     random.seed(seed + worker_id)
 
     # Create local environment and model
-    local_env = gym.make(env_name)
-    local_model = ActorCriticNetwork(n_observations, n_actions).to(worker_device)
+    local_env = gym.make(env_name, **ARGS)
+    local_model = ActorCriticNetwork(n_observations, n_actions, observation_type).to(worker_device)
 
     # Initial sync with global model
     local_model.load_state_dict(global_model.state_dict())
@@ -35,7 +35,11 @@ def worker(worker_id: int,
     local_model.train()
 
     state, _ = local_env.reset(seed=seed + worker_id)  # Initial state (returns obs, info)
-    state = torch.tensor(state, dtype=torch.float32, device=worker_device)  # Convert to tensor
+    # Convert to tensor with appropriate dtype based on observation type
+    if observation_type == "discrete":
+        state = torch.tensor(state, dtype=torch.long, device=worker_device)
+    else:
+        state = torch.tensor(state, dtype=torch.float32, device=worker_device)
 
     episode_reward = 0.0
     episode_length = 0
@@ -72,8 +76,11 @@ def worker(worker_id: int,
                 next_state, reward, terminated, truncated, info = local_env.step(action.item())
                 done = terminated or truncated  # Episode ends if terminated or truncated
                 
-                # Convert next_state to tensor
-                next_state = torch.tensor(next_state, dtype=torch.float32, device=worker_device)
+                # Convert next_state to tensor with appropriate dtype
+                if observation_type == "discrete":
+                    next_state = torch.tensor(next_state, dtype=torch.long, device=worker_device)
+                else:
+                    next_state = torch.tensor(next_state, dtype=torch.float32, device=worker_device)
 
                 # Store transition data (log_prob, value_pred, entropy now have grad history)
                 log_probs_list.append(log_prob)
@@ -107,7 +114,11 @@ def worker(worker_id: int,
                     episode_count += 1
                     result_queue.put(("episode_end", worker_id, episode_reward, episode_length))
                     state, _ = local_env.reset(seed=seed + worker_id + episode_count)  # Reset with new seed
-                    state = torch.tensor(state, dtype=torch.float32, device=worker_device)  # Convert to tensor
+                    # Convert to tensor with appropriate dtype based on observation type
+                    if observation_type == "discrete":
+                        state = torch.tensor(state, dtype=torch.long, device=worker_device)
+                    else:
+                        state = torch.tensor(state, dtype=torch.float32, device=worker_device)
                     episode_reward = 0.0
                     episode_length = 0
                     break # End inner rollout loop
