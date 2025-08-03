@@ -3,7 +3,7 @@ import torch.multiprocessing as mp # Use torch multiprocessing
 # Environment configuration
 # Choose either "CartPole-v1" or "LunarLander-v3"
 # NOTE: For LunarLander-v3, you need to install Box2D: pip install "gymnasium[box2d]"
-ENV_NAME = "FrozenLake-v1"  # Change to "LunarLander-v3" if desired (requires Box2D installation)
+ENV_NAME = "LunarLander-v3"  # Change to "LunarLander-v3" if desired (requires Box2D installation)
 
 # Environment-specific parameters
 if ENV_NAME == "CartPole-v1":
@@ -36,7 +36,12 @@ elif ENV_NAME == "LunarLander-v3":
     MAX_STEPS_PER_EPISODE_A3C = 1000
 
     # --- Environment Arguments --
-    ARGS = dict()
+    ARGS = {"continuous":False, 
+            # "gravity":-10.0,
+            # "enable_wind":False, 
+            # "wind_power":15.0, 
+            # "turbulence_power":1.5
+               }
 
 elif ENV_NAME == "FrozenLake-v1":
     n_observations = 16  # 4x4 grid, 16 possible states (0-15)

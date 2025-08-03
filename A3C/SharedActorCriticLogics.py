@@ -80,13 +80,6 @@ class ActorCriticNetwork(nn.Module):
             state_value = state_value.squeeze(0)
 
         return action_dist, state_value
-        state_value = self.critic_head(shared_features)
-
-        # If input had no batch dim, remove it from output value
-        if x.shape[0] == 1 and state_value.dim() > 0: # Check state_value dim > 0 before squeeze
-            state_value = state_value.squeeze(0)
-
-        return action_dist, state_value
     
 def compute_n_step_returns_advantages(rewards: List[float],
                                       values: List[torch.Tensor],
@@ -133,5 +126,11 @@ def compute_n_step_returns_advantages(rewards: List[float],
 
     # Standardization of advantages is often helpful but omitted here for simplicity
     # advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+    # Safe normalization: only if more than one element and nonzero variance
+    if advantages.numel() > 1:
+        adv_mean = advantages.mean()
+        adv_std = advantages.std()
+        if adv_std > 0:
+            advantages = (advantages - adv_mean) / (adv_std + 1e-8)
 
     return returns, advantages

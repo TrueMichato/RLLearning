@@ -186,8 +186,12 @@ def worker(worker_id: int,
             # Entropy bonus - mean entropy over the batch
             entropy_loss = -entropies_tensor.mean()
 
+            progress_ratio = current_global_step / max_global_steps
+            # Linearly decay entropy coefficient (e.g. from ENTROPY_COEFF to 0)
+            entropy_coeff_now = entropy_coeff * (1.0 - progress_ratio)
+
             # Combined loss
-            total_loss = policy_loss + value_loss_coeff * value_loss + entropy_coeff * entropy_loss
+            total_loss = policy_loss + value_loss_coeff * value_loss + entropy_coeff_now * entropy_loss
 
             # --- Compute Gradients and Update Global Network ---
             # Ensure model is in training mode for backward pass
@@ -195,6 +199,7 @@ def worker(worker_id: int,
 
             # Zero gradients of the *global* optimizer/model before local calculation
             global_optimizer.zero_grad()
+            local_model.zero_grad()
 
             # Calculate gradients for the local model based on the total loss
             total_loss.backward()
@@ -216,6 +221,8 @@ def worker(worker_id: int,
 
             # Apply the gradients using the shared optimizer (updates global model)
             global_optimizer.step()
+            for param_group in global_optimizer.param_groups:
+                param_group["lr"] = LR_A3C * (1.0 - progress_ratio)
 
             # Check if max global steps reached after update
             if global_counter.value >= max_global_steps and not stop_event.is_set():
