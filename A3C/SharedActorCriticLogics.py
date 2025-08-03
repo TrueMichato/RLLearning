@@ -2,18 +2,24 @@ from imports import *
 
 class ActorCriticNetwork(nn.Module):
     """ Combined Actor-Critic network for A3C that handles both discrete and continuous observation spaces """
-    def __init__(self, n_observations: int, n_actions: int, observation_type: str = "continuous"):
+    def __init__(self, n_observations: int, n_actions: int, observation_type: str = "continuous", action_space_type: str = "discrete"):
         super(ActorCriticNetwork, self).__init__()
         
         self.observation_type = observation_type
         self.n_observations = n_observations
-        
+        self.action_space_type = action_space_type
+
         # Shared layers
         self.layer1 = nn.Linear(self.n_observations, 128)
         self.layer2 = nn.Linear(128, 128)
 
         # Actor head (outputs action logits)
-        self.actor_head = nn.Linear(128, n_actions)
+
+        if self.action_space_type == "discrete":
+            self.actor_head = nn.Linear(128, n_actions)        # logits
+        else:                                                  # continuous
+            self.actor_mean = nn.Linear(128, n_actions)
+            self.log_std    = nn.Parameter(torch.zeros(n_actions))
 
         # Critic head (outputs state value)
         self.critic_head = nn.Linear(128, 1)
@@ -68,9 +74,15 @@ class ActorCriticNetwork(nn.Module):
         shared_features = F.relu(self.layer2(x))
 
         # Actor head
-        action_logits = self.actor_head(shared_features)
-        # Ensure logits are on the same device before creating Categorical
-        action_dist = Categorical(logits=action_logits.to(x.device))
+        if self.action_space_type == "discrete":
+            action_logits = self.actor_head(shared_features)
+            action_dist   = Categorical(logits=action_logits.to(x.device))
+
+        else:  # Continuous action space
+            action_mean = self.actor_mean(shared_features)
+            action_std  =  self.log_std.exp().expand_as(action_mean)
+            action_dist = Normal(loc=action_mean.to(x.device), scale=action_std.to(x.device))
+
 
         # Critic head
         state_value = self.critic_head(shared_features)
@@ -125,7 +137,6 @@ def compute_n_step_returns_advantages(rewards: List[float],
         advantages[t] = R - value_t
 
     # Standardization of advantages is often helpful but omitted here for simplicity
-    # advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
     # Safe normalization: only if more than one element and nonzero variance
     if advantages.numel() > 1:
         adv_mean = advantages.mean()

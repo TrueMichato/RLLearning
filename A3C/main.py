@@ -17,7 +17,7 @@ if __name__ == "__main__":
 
     # --- Initialization ---
     # Initialize Global Network (on CPU, as share_memory works best)
-    global_model_a3c = ActorCriticNetwork(n_observations, n_actions, observation_type).to(device)
+    global_model_a3c = ActorCriticNetwork(n_observations, n_actions, observation_type, action_space_type).to(device)
     # Crucial step: Ensure model parameters are shared across processes
     global_model_a3c.share_memory()
     print(f"Global model initialized on {device} and set to shared memory.")
@@ -36,11 +36,18 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"❌ Failed to record initial policy: {e}")
 
+   
     # Initialize Optimizer (acts on the shared global model's parameters)
     # Adam is common, but RMSprop was used in the original A3C paper
     global_optimizer_a3c = optim.RMSprop(global_model_a3c.parameters(), lr=LR_A3C, alpha=0.99, eps=1e-5)
     # global_optimizer_a3c = optim.Adam(global_model_a3c.parameters(), lr=LR_A3C)
     print(f"Global optimizer initialized: {type(global_optimizer_a3c).__name__}")
+
+    best_avg = -float("inf")
+    # simple LR scheduler: cut LR by 0.5 when plateau on best_avg
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        global_optimizer_a3c, mode="max", factor=0.5, patience=500, verbose=True
+    )
 
     # Shared counter for total steps taken across all workers
     global_step_counter = mp.Value('i', 0) # 'i' for integer, starts at 0
@@ -103,9 +110,16 @@ if __name__ == "__main__":
 
                     # Print progress periodically based on total episodes collected
                     if len(a3c_episode_rewards) % 50 == 0:
-                         avg_r = np.mean(a3c_episode_rewards[-50:]) if len(a3c_episode_rewards) >= 50 else np.mean(a3c_episode_rewards)
-                         avg_l = np.mean(a3c_episode_lengths[-50:]) if len(a3c_episode_lengths) >= 50 else np.mean(a3c_episode_lengths)
-                         print(f" > Steps: {global_step_counter.value}, Episodes: {len(a3c_episode_rewards)}, Avg Reward (last 50): {avg_r:.2f}, Avg Length (last 50): {avg_l:.1f}")
+                        avg_r = np.mean(a3c_episode_rewards[-50:]) if len(a3c_episode_rewards) >= 50 else np.mean(a3c_episode_rewards)
+                        avg_l = np.mean(a3c_episode_lengths[-50:]) if len(a3c_episode_lengths) >= 50 else np.mean(a3c_episode_lengths)
+                        print(f" > Steps: {global_step_counter.value}, Episodes: {len(a3c_episode_rewards)}, Avg Reward (last 50): {avg_r:.2f}, Avg Length (last 50): {avg_l:.1f}")
+                        if avg_r > best_avg:
+                            best_avg = avg_r
+                            torch.save(global_model_a3c.state_dict(), "best.pt")
+                            print(f"📌 New best MA50={best_avg:.2f}, saved best.pt")
+
+                    # feed scheduler
+                    scheduler.step(avg_r)
 
                 elif message_type == "progress":
                     current_step = result[2]
@@ -161,7 +175,7 @@ if __name__ == "__main__":
                         intermediate_reward = record_policy_demonstration(
                             model=global_model_a3c,
                             env_name=ENV_NAME,
-                            stage=f"{milestone_percent}percent",
+                            stage=f"{milestone_percent}%",
                             format=VIDEO_FORMAT
                         )
                         print(f"✅ {milestone_percent}% policy recorded. Average reward: {intermediate_reward:.2f}")
@@ -186,7 +200,7 @@ if __name__ == "__main__":
     print(f"\n--- {ENV_NAME} Training Finished (A3C) ---")
     print(f"Total global steps reached: {global_step_counter.value}")
     print(f"Total episodes completed: {len(a3c_episode_rewards)}")
-    print(f"Training time: {end_time - start_time:.2f} seconds")
+    print(f"Training time: {end_time - start_time:.2f} seconds, {(end_time - start_time) / 60:.2f} minutes")
     if error_occurred:
         print("Training finished DUE TO AN ERROR in one or more workers.")
     if active_workers_final_check:
@@ -196,6 +210,8 @@ if __name__ == "__main__":
     if RECORD_FINAL_POLICY and not error_occurred:
         print("\n🎬 Recording final (trained) policy...")
         try:
+            global_model_a3c.load_state_dict(torch.load("best.pt", map_location=device))
+            print(f"🔄 Loaded best.pt for demo (MA50={best_avg:.2f})")
             final_reward = record_policy_demonstration(
                 model=global_model_a3c, 
                 env_name=ENV_NAME, 

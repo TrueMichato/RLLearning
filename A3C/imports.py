@@ -15,7 +15,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-from torch.distributions import Categorical
+from torch.distributions import Categorical, Normal
 import torch.multiprocessing as mp # Use torch multiprocessing
 
 from settings import *

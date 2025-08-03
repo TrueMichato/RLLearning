@@ -48,10 +48,14 @@ def evaluate_policy(model: ActorCriticNetwork, env_name: str, num_episodes: int 
             # Get action from policy (no exploration - use mode)
             with torch.no_grad():
                 action_dist, _ = model(state)
-                action = action_dist.mode  # Use most likely action instead of sampling
-            
+                if action_space_type == "continuous":
+                     # deterministic action = mean of Normal; reshape to (1,)
+                     action_env = action_dist.mean.cpu().numpy().reshape(-1).astype(np.float32)
+                else:  # discrete
+                    action_env = action_dist.mode.item()
+
             # Take action
-            next_state, reward, terminated, truncated, _ = env.step(action.item())
+            next_state, reward, terminated, truncated, _ = env.step(action_env)
             done = terminated or truncated
             
             episode_reward += reward
@@ -156,7 +160,7 @@ def record_policy_demonstration(model: ActorCriticNetwork, env_name: str, stage:
     avg_reward, frames = evaluate_policy(
         model=model,
         env_name=env_name,
-        num_episodes=3,  # Record 3 episodes
+        num_episodes=10,  # Record 10 episodes
         render_mode="rgb_array",
         seed=42  # Use fixed seed for reproducibility
     )
