@@ -3,7 +3,7 @@ import torch.multiprocessing as mp # Use torch multiprocessing
 # Environment configuration
 # Choose either "CartPole-v1" or "LunarLander-v3"
 # NOTE: For LunarLander-v3, you need to install Box2D: pip install "gymnasium[box2d]"
-ENV_NAME = "LunarLander-v3"  # Change to "LunarLander-v3" if desired (requires Box2D installation)
+ENV_NAME = "CartPole-v1"  # Change to "LunarLander-v3" if desired (requires Box2D installation)
 
 # Environment-specific parameters
 if ENV_NAME == "CartPole-v1":
@@ -31,12 +31,12 @@ elif ENV_NAME == "LunarLander-v3":
     #     action_space_type = "continuous"
     # --- Hyperparameter Setup ---
     GAMMA_A3C = 0.99             # Discount factor
-    LR_A3C = 3e-4                # Higher learning rate for faster learning
+    LR_A3C = 8e-4                # Higher learning rate for faster learning
     N_STEPS = 20                 # Longer rollouts for better credit assignment
     VALUE_LOSS_COEFF_A3C = 1.0   # Higher value loss coefficient for better bootstrapping
     ENTROPY_COEFF_A3C = 0.01    # Lower entropy coefficient for less random exploration
     MAX_GLOBAL_STEPS_A3C = 5000000  # More training steps needed for complex environment
-    MAX_STEPS_PER_EPISODE_A3C = 1000
+    MAX_STEPS_PER_EPISODE_A3C = 10000
 
     # --- Environment Arguments --
     ARGS = {"continuous":False, 

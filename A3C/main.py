@@ -44,10 +44,10 @@ if __name__ == "__main__":
     print(f"Global optimizer initialized: {type(global_optimizer_a3c).__name__}")
 
     best_avg = -float("inf")
-    # simple LR scheduler: cut LR by 0.5 when plateau on best_avg
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        global_optimizer_a3c, mode="max", factor=0.5, patience=500, verbose=True
-    )
+    # # simple LR scheduler: cut LR by 0.5 when plateau on best_avg
+    # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+    #     global_optimizer_a3c, mode="max", factor=0.5, patience=500
+    # )
 
     # Shared counter for total steps taken across all workers
     global_step_counter = mp.Value('i', 0) # 'i' for integer, starts at 0
@@ -118,8 +118,8 @@ if __name__ == "__main__":
                             torch.save(global_model_a3c.state_dict(), "best.pt")
                             print(f"📌 New best MA50={best_avg:.2f}, saved best.pt")
 
-                    # feed scheduler
-                    scheduler.step(avg_r)
+                    # # feed scheduler
+                        # scheduler.step(avg_r)  # Step optimizer after processing episode end
 
                 elif message_type == "progress":
                     current_step = result[2]
@@ -210,8 +210,6 @@ if __name__ == "__main__":
     if RECORD_FINAL_POLICY and not error_occurred:
         print("\n🎬 Recording final (trained) policy...")
         try:
-            global_model_a3c.load_state_dict(torch.load("best.pt", map_location=device))
-            print(f"🔄 Loaded best.pt for demo (MA50={best_avg:.2f})")
             final_reward = record_policy_demonstration(
                 model=global_model_a3c, 
                 env_name=ENV_NAME, 
@@ -226,6 +224,21 @@ if __name__ == "__main__":
                 print(f"🚀 Policy improvement: {improvement:.2f} (from {initial_reward:.2f} to {final_reward:.2f})")
         except Exception as e:
             print(f"❌ Failed to record final policy: {e}")
+    
+    global_model_a3c.load_state_dict(torch.load("best.pt", map_location=device))
+    print(f"🔄 Loaded best.pt for demo (MA50={best_avg:.2f})")
+    best_reward = record_policy_demonstration(
+                model=global_model_a3c, 
+                env_name=ENV_NAME, 
+                stage="best", 
+                format=VIDEO_FORMAT
+            )
+    print(f"✅ Best policy recorded. Average reward: {best_reward:.2f}")
+            
+            # Show improvement if we recorded initial policy
+    if RECORD_INITIAL_POLICY and 'initial_reward' in locals():
+        improvement = best_reward - initial_reward
+        print(f"🚀 Policy improvement: {improvement:.2f} (from {initial_reward:.2f} to {best_reward:.2f})")
 
     # --- Plotting Results ---
     if a3c_episode_rewards:
