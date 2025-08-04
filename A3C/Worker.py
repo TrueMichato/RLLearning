@@ -203,7 +203,7 @@ def worker(worker_id: int,
             # TODO: maybe decay entropy only for some envs?
             progress_ratio = current_global_step / max_global_steps
             # Linearly decay entropy coefficient (e.g. from ENTROPY_COEFF to 0.001)
-            entropy_coeff_now = entropy_coeff # max(entropy_coeff * (1.0 - progress_ratio), ENTROPY_MIN)
+            entropy_coeff_now =  max(entropy_coeff * (1.0 - progress_ratio), ENTROPY_MIN)
 
             # Combined loss
             total_loss = policy_loss + value_loss_coeff * value_loss + entropy_coeff_now * entropy_loss
@@ -237,7 +237,7 @@ def worker(worker_id: int,
             # Apply the gradients using the shared optimizer (updates global model)
             global_optimizer.step()
             for param_group in global_optimizer.param_groups:
-                param_group["lr"] = LR_A3C * 1 # max((1.0 - progress_ratio), 0.001)
+                param_group["lr"] = LR_A3C * max((1.0 - progress_ratio), 0.001)
 
             # Check if max global steps reached after update
             if global_counter.value >= max_global_steps and not stop_event.is_set():
