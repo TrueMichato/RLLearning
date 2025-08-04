@@ -35,7 +35,7 @@ elif ENV_NAME == "LunarLander-v3":
     N_STEPS = 20                 # Longer rollouts for better credit assignment
     VALUE_LOSS_COEFF_A3C = 1.0   # Higher value loss coefficient for better bootstrapping
     ENTROPY_COEFF_A3C = 0.01    # Lower entropy coefficient for less random exploration
-    MAX_GLOBAL_STEPS_A3C = 5000000  # More training steps needed for complex environment
+    MAX_GLOBAL_STEPS_A3C = 2000000  # More training steps needed for complex environment
     MAX_STEPS_PER_EPISODE_A3C = 1000
 
     # --- Environment Arguments --
