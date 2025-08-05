@@ -26,8 +26,7 @@ device = torch.device("cpu")
 print(f"Using device: {device}")
 
 # Set random seeds for reproducibility in the main process
-# Note: workers will need their own seeding if full reproducibility is needed
-seed = 42
+seed = 9
 random.seed(seed)
 np.random.seed(seed)
 torch.manual_seed(seed)

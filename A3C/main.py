@@ -6,8 +6,6 @@ from visualize_policy import record_policy_demonstration
 
 if __name__ == "__main__":
 
-    # Set multiprocessing start method (important for some OS like macOS/Windows)
-    # 'spawn' is generally safer than 'fork' with CUDA/threading
     try:
         mp.set_start_method('spawn', force=True)
         print("Multiprocessing start method set to 'spawn'.")
@@ -16,9 +14,8 @@ if __name__ == "__main__":
 
 
     # --- Initialization ---
-    # Initialize Global Network (on CPU, as share_memory works best)
+    # Initialize Global Network
     global_model_a3c = ActorCriticNetwork(n_observations, n_actions, observation_type, action_space_type).to(device)
-    # Crucial step: Ensure model parameters are shared across processes
     global_model_a3c.share_memory()
     print(f"Global model initialized on {device} and set to shared memory.")
 
@@ -38,9 +35,7 @@ if __name__ == "__main__":
 
    
     # Initialize Optimizer (acts on the shared global model's parameters)
-    # Adam is common, but RMSprop was used in the original A3C paper
     global_optimizer_a3c = optim.RMSprop(global_model_a3c.parameters(), lr=LR_A3C, alpha=0.99, eps=1e-5)
-    # global_optimizer_a3c = optim.Adam(global_model_a3c.parameters(), lr=LR_A3C)
     print(f"Global optimizer initialized: {type(global_optimizer_a3c).__name__}")
 
     best_avg = -float("inf")
@@ -60,7 +55,7 @@ if __name__ == "__main__":
     # Lists for plotting overall progress (collected from queue)
     a3c_episode_rewards = []
     a3c_episode_lengths = []
-    # all_worker_stats = {i: {"rewards": [], "lengths": []} for i in range(NUM_WORKERS)} # Optional detailed tracking
+    # all_worker_stats = {i: {"rewards": [], "lengths": []} for i in range(NUM_WORKERS)} 
 
     print(f"\nStarting A3C Training with {NUM_WORKERS} workers...")
     print(f"Target Max Global Steps: {MAX_GLOBAL_STEPS_A3C}")
@@ -82,8 +77,6 @@ if __name__ == "__main__":
         workers.append(worker_process)
         worker_process.start()
         print(f"Worker {i} process started.")
-
-    # --- Monitor Queue and Collect Results ---
     finished_workers = 0
     progress_updates = 0
     error_occurred = False
@@ -96,7 +89,7 @@ if __name__ == "__main__":
         try:
             # Get result from the queue (blocks until item available)
             # Add a timeout to prevent hanging indefinitely if something goes wrong
-            result = result_queue.get(timeout=120) # Increased timeout
+            result = result_queue.get(timeout=120) 
 
             if isinstance(result, tuple):
                 message_type = result[0]
@@ -118,15 +111,13 @@ if __name__ == "__main__":
                             torch.save(global_model_a3c.state_dict(), "best.pt")
                             print(f"📌 New best MA50={best_avg:.2f}, saved best.pt")
 
-                    # # feed scheduler
-                        # scheduler.step(avg_r)  # Step optimizer after processing episode end
+                        # feed scheduler
+                        # scheduler.step(avg_r) 
 
                 elif message_type == "progress":
                     current_step = result[2]
                     progress_updates += 1
-                    # Optional: Print less frequently
-                    # if progress_updates % (NUM_WORKERS * 10) == 0:
-                    #      print(f"   Progress Update: Global Steps ~{current_step}")
+      
 
                 elif message_type == "error":
                     error_msg = result[2]
@@ -134,7 +125,7 @@ if __name__ == "__main__":
                     error_occurred = True
                     if not stop_event.is_set():
                         print("   Signaling other workers to stop due to error.")
-                        stop_event.set() # Signal all other workers to stop
+                        stop_event.set()
 
                 elif message_type == "finished":
                     print(f"Worker {worker_id} signaled completion.")
@@ -154,11 +145,7 @@ if __name__ == "__main__":
                  break # Exit monitoring loop
             if stop_event.is_set():
                  print("Stop event is set, likely due to error, max steps, or manual stop. Waiting for workers to finish.")
-                 # Continue waiting for "finished" signals or timeout join later
-                 # Break here might prevent collecting final "finished" signals
-                 # Let the loop continue until finished_workers == NUM_WORKERS or join times out
 
-        # Check if max steps reached globally, even if workers haven't signaled finish yet
         if not stop_event.is_set() and global_step_counter.value >= MAX_GLOBAL_STEPS_A3C:
             print(f"Max global steps ({MAX_GLOBAL_STEPS_A3C}) reached. Signaling workers to stop.")
             stop_event.set()
@@ -181,16 +168,16 @@ if __name__ == "__main__":
                         print(f"✅ {milestone_percent}% policy recorded. Average reward: {intermediate_reward:.2f}")
                     except Exception as e:
                         print(f"❌ Failed to record {milestone_percent}% policy: {e}")
-                    break  # Only record one milestone per iteration
+                    break  
 
     # --- Wait for all Worker Processes to Finish ---
     print("\nWaiting for worker processes to join...")
     active_workers_final_check = []
     for i, p in enumerate(workers):
-        p.join(timeout=30) # Add a reasonable timeout for join
+        p.join(timeout=40)
         if p.is_alive():
             print(f"Warning: Worker {i} did not join cleanly after timeout. Terminating.")
-            p.terminate() # Forcefully terminate if stuck
+            p.terminate() 
             active_workers_final_check.append(i)
         # else:
         #      print(f"Worker {i} joined successfully. Exit code: {p.exitcode}")
@@ -275,7 +262,7 @@ if __name__ == "__main__":
         plt.tight_layout()
         plt.savefig(f"a3c_{ENV_NAME.lower().replace('-', '_')}_training_progress.png")
         print(f"\n📊 Plot saved to a3c_{ENV_NAME.lower().replace('-', '_')}_training_progress.png")
-        # plt.show() # Uncomment to display plot directly
+        # plt.show() 
     else:
         print("\nNo episode data collected, skipping plotting.")
 
@@ -294,4 +281,3 @@ if __name__ == "__main__":
             print(f"     • {clean_env}_final_policy.{VIDEO_FORMAT}")
 
     print("\n🎉 Script finished successfully!")
-    print("💡 Tip: Open the GIF files to see how the policy evolved during training!")

@@ -13,7 +13,7 @@ class ActorCriticNetwork(nn.Module):
         self.layer1 = nn.Linear(self.n_observations, 128)
         self.layer2 = nn.Linear(128, 128)
 
-        # Actor head (outputs action logits)
+        # Actor head
 
         if self.action_space_type == "discrete":
             self.actor_head = nn.Linear(128, n_actions)        # logits
@@ -21,7 +21,7 @@ class ActorCriticNetwork(nn.Module):
             self.actor_mean = nn.Linear(128, n_actions)
             self.log_std    = nn.Parameter(torch.zeros(n_actions))
 
-        # Critic head (outputs state value)
+        # Critic head
         self.critic_head = nn.Linear(128, 1)
 
     def _preprocess_observation(self, x: torch.Tensor) -> torch.Tensor:
@@ -66,7 +66,6 @@ class ActorCriticNetwork(nn.Module):
             - Action distribution (Categorical).
             - State value estimate (Tensor).
         """
-        # Preprocess observation based on type
         x = self._preprocess_observation(x)
 
         # Shared layers
@@ -78,7 +77,7 @@ class ActorCriticNetwork(nn.Module):
             action_logits = self.actor_head(shared_features)
             action_dist   = Categorical(logits=action_logits.to(x.device))
 
-        else:  # Continuous action space
+        else: 
             action_mean = self.actor_mean(shared_features)
             action_std  =  self.log_std.exp().expand_as(action_mean)
             action_dist = Normal(loc=action_mean.to(x.device), scale=action_std.to(x.device))
@@ -114,7 +113,6 @@ def compute_n_step_returns_advantages(rewards: List[float],
         - advantages: Advantage estimates for the actor (on CPU).
     """
     n_steps = len(rewards)
-    # Detach values *here* for calculation, they retain grad_fn upstream for loss
     values_tensor = torch.cat([v.detach() for v in values]).squeeze().to(torch.device("cpu"))
 
     # Detach bootstrap value as well and ensure it's on CPU
@@ -131,13 +129,11 @@ def compute_n_step_returns_advantages(rewards: List[float],
         R = rewards[t] + gamma * R * (1.0 - dones[t])
         returns[t] = R
 
-        # Advantage A_t = n_step_return(R_t) - V(s_t) (using detached value here)
-        # Ensure values_tensor has the right shape if n_steps=1
+        # Advantage
         value_t = values_tensor if values_tensor.dim() == 0 else values_tensor[t]
         advantages[t] = R - value_t
 
-    # Standardization of advantages is often helpful but omitted here for simplicity
-    # Safe normalization: only if more than one element and nonzero variance
+    # Standardization of advantages
     if advantages.numel() > 1:
         adv_mean = advantages.mean()
         adv_std = advantages.std()

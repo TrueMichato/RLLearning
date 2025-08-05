@@ -1,9 +1,7 @@
-import torch.multiprocessing as mp # Use torch multiprocessing
+import torch.multiprocessing as mp
 
 # Environment configuration
-# Choose either "CartPole-v1" or "LunarLander-v3"
-# NOTE: For LunarLander-v3, you need to install Box2D: pip install "gymnasium[box2d]"
-ENV_NAME = "LunarLander-v3"  # Change to "LunarLander-v3" if desired (requires Box2D installation)
+ENV_NAME = "CartPole-v1" 
 
 # Environment-specific parameters
 if ENV_NAME == "CartPole-v1":
@@ -88,13 +86,10 @@ else:
 ENTROPY_MIN = 0.0001
 
 print(f"Environment: {ENV_NAME}")
-# print(f"Observation space: {gym}")
-# print(f"Action space: {n_actions}")
-
-
+print(f"Observation space: {n_observations}")
+print(f"Action space: {n_actions}")
 
 NUM_WORKERS = mp.cpu_count() # Use number of available CPU cores
-# NUM_WORKERS = 4 # Or set manually
 
 
 # Policy Recording Settings
